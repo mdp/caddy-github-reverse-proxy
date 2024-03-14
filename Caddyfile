@@ -1,0 +1,71 @@
+{
+	# debug
+
+	order authenticate before respond
+	order authorize before basicauth
+
+	security {
+		oauth identity provider github {$GITHUB_CLIENT_ID} {$GITHUB_CLIENT_KEY}
+
+		authentication portal myportal {
+			crypto default token lifetime 3600
+			crypto key sign-verify {$JWT_SHARED_KEY}
+			cookie domain {$DOMAIN_BASE}
+			enable identity provider github
+			ui {
+				links {
+					"My Identity" "/whoami" icon "las la-user"
+				}
+			}
+
+			transform user {
+				match realm github
+				match sub github.com/{$GITHUB_USER}
+				action add role authp/admin
+			}
+		}
+
+		authorization policy mypolicy {
+			set auth url https://auth.{$DOMAIN_BASE}/oauth2/github
+			crypto key verify {$JWT_SHARED_KEY}
+			allow roles authp/admin authp/user
+			validate bearer header
+			inject headers with claims
+		}
+	}
+}
+
+# (tls_config) {
+# 	tls {$CLOUDFLARE_ACCOUNT} {
+# 		dns cloudflare {$CLOUDFLARE_API_KEY}
+# 	}
+# }
+
+*.{$DOMAIN_BASE} {
+
+	tls {$CLOUDFLARE_ACCOUNT} {
+		dns cloudflare {$CLOUDFLARE_API_KEY}
+	}
+
+	@auth host auth.{$DOMAIN_BASE}
+	handle @auth {
+		authenticate with myportal
+	}
+
+	@test host test.{$DOMAIN_BASE}
+	handle @test {
+		authorize with mypolicy
+		root * /www
+		file_server
+	}
+
+	@devpod host devpod.{$DOMAIN_BASE}
+	handle @devpod {
+			reverse_proxy 172.17.0.1:10800 {
+					header_up Host {host}
+					header_up X-Real-IP {remote_host}
+			}
+	}
+
+}
+
