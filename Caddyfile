@@ -35,12 +35,6 @@
 	}
 }
 
-# (tls_config) {
-# 	tls {$CLOUDFLARE_ACCOUNT} {
-# 		dns cloudflare {$CLOUDFLARE_API_KEY}
-# 	}
-# }
-
 *.{$DOMAIN_BASE} {
 
 	tls {$CLOUDFLARE_ACCOUNT} {
